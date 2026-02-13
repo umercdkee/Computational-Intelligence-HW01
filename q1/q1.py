@@ -17,6 +17,7 @@
 # Step 0: Chromosome: vector of num_cities, Fitness function: Distance between i to i+1.
 
 import random
+from turtle import right
 import numpy as np
 
 class EA_TSP:
@@ -83,28 +84,25 @@ class EA_TSP:
         new_child = np.zeros(self.num_cities, dtype=int)
 
         new_child[left:right+1] = self.chromosomes[parents_idx[0]][left:right+1]
-        count = (right-left) + 1
+        placed = set(new_child[left:right+1])  # track what's already placed
+
         ptr_new_child = (right + 1) % self.num_cities
         ptr_traverse = (right + 1) % self.num_cities
 
-        while True:
-            if count == self.num_cities:
-                break
-
-            if self.chromosomes[parents_idx[1]][ptr_traverse] not in new_child:
-                new_child[ptr_new_child] = self.chromosomes[parents_idx[1]][ptr_traverse]
+        while len(placed) < self.num_cities:
+            city = self.chromosomes[parents_idx[1]][ptr_traverse]
+            if city not in placed:
+                new_child[ptr_new_child] = city
+                placed.add(city)
                 ptr_new_child = (ptr_new_child + 1) % self.num_cities
-                ptr_traverse = (ptr_traverse + 1) % self.num_cities
-            else:
-                ptr_traverse = (ptr_traverse + 1) % self.num_cities
-
-            if (ptr_traverse == right):
-                break
-
-        # Mutation
-        random_nums = np.random.choice(a=self.num_cities, size=2, replace= False)
-
-        new_child[random_nums[0]], new_child[random_nums[1]] = new_child[random_nums[1]], new_child[random_nums[0]]
+            ptr_traverse = (ptr_traverse + 1) % self.num_cities
+            
+        # Mutation (probability 0.1) rather than always
+        prob_mutation = np.random.uniform(0,1)
+        if prob_mutation <= 0.1:
+            l = random.randint(0, self.num_cities-1)
+            r = random.randint(l, self.num_cities-1)
+            new_child[l:r+1] = new_child[l:r+1][::-1]
 
         return new_child
     
@@ -121,35 +119,13 @@ class EA_TSP:
     
 
     def kill_members(self):
-        # Rank based selection
-        rank_indices = np.argsort(self.curr_fitness)[::1]
-
-        total = (self.population_size*(self.population_size+1))/2
-        probs = np.zeros(self.population_size)
-
-        curr_rank = self.population_size
-        for i in rank_indices:
-            probs[i] = curr_rank / float(total)
-            curr_rank -= 1
-
-        rand_num = np.random.uniform(0,1,2)
-        kill_user = []
-        for i in rand_num:
-            left = 0
-            right = 0
-
-            for j in range(len(probs)):
-                left = right
-                right = left + probs[j]
-
-                if i >= left and i <= right:
-                    kill_user.append(j)
-                    break
-
-        return kill_user
+        # Just kill the worst member?
+        return np.argmax(self.curr_fitness)
 
 
-    def run_loop(self, num_generations):
+    def run_loop(self, num_generations, patience = 15000):
+        best_ever_fitness = float('inf')
+        termination_count = 0
 
         for gen in range(num_generations):
             new_child = self.create_offspring()
@@ -157,8 +133,25 @@ class EA_TSP:
 
             kill_user = self.kill_members()
 
-            self.chromosomes[kill_user[0]] = new_child
-            self.curr_fitness[kill_user[0]] = new_child_fitness
+            # Replace only if new child is better
+            if new_child_fitness < self.curr_fitness[kill_user]:
+                self.chromosomes[kill_user] = new_child
+                self.curr_fitness[kill_user] = new_child_fitness
+
+            curr_best = np.min(self.curr_fitness)
+            if curr_best < best_ever_fitness:
+                best_ever_fitness = curr_best
+                termination_count = 0
+            else:
+                termination_count += 1
+
+            if termination_count >= patience:
+                print(f"Terminating at generation {gen} due to no improvement in {patience} generations.")
+                break
+                
+
+            if gen % 1000 == 0:
+                print(f"Gen {gen}: Best Dist = {np.min(self.curr_fitness):.2f}")
 
         best_idx = np.argmin(self.curr_fitness)
         best_route = self.chromosomes[best_idx]
@@ -221,8 +214,8 @@ def main():
     distance_matrix = compute_distance_matrix(coordinates)
     
     # Initialize EA
-    population_size = 50
-    num_generations = 500
+    population_size = 500
+    num_generations = 500000
     
     ea = EA_TSP(distance_matrix, population_size)
     ea.initialize_population()
