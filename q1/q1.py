@@ -14,8 +14,6 @@
 # • Step 7: Go to Step 2 until the termination criteria are met.
 
 
-# Step 0: Chromosome: vector of num_cities, Fitness function: Distance between i to i+1.
-
 import os
 import sys
 import random

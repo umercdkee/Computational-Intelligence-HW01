@@ -93,7 +93,7 @@ class BaseEA:
 
 		return parents_idx
 
-	# Common EA loop (Assumes single offspring)
+	# Common EA loop
 	def run_loop(self, num_generations, patience=15000):
 		best_ever_fitness = float("inf") if self.minimize else float("-inf")
 		termination_count = 0
